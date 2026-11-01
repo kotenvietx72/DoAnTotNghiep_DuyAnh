@@ -1,0 +1,53 @@
+name: Web checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: duy anh
+    env:
+      TELEGRAM_ENABLED: "0"
+      PYTHON_DOTENV_DISABLED: "1"
+      ROOM_DATABASE: /tmp/epu-ci/rooms.sqlite3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: duy anh/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Python tests
+        run: python -m unittest discover -s tests -v
+      - name: JavaScript syntax
+        run: |
+          node --check static/js/app.js
+          node --check static/js/room-model.js
+      - name: Gunicorn startup and API smoke test
+        run: |
+          gunicorn --worker-class gthread --workers 1 --threads 20 --bind 127.0.0.1:5000 app:app &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5000/api/state >/dev/null; then
+              exit 0
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              exit 1
+            fi
+            sleep 1
+          done
+          exit 1

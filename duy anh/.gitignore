@@ -1,0 +1,10 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+data/
+test-results/
+backup_*.zip
+.env
+.env.*
+!.env.example

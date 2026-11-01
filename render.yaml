@@ -1,0 +1,28 @@
+# This configuration creates a PAID web service and a 1 GB persistent disk
+# only when the repository owner creates a Blueprint in Render.
+services:
+  - type: web
+    name: epu-energy
+    runtime: python
+    plan: 0.5c-512mb
+    region: singapore
+    branch: main
+    rootDir: duy anh
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class gthread --workers 1 --threads 20 --bind 0.0.0.0:$PORT app:app
+    autoDeployTrigger: commit
+    healthCheckPath: /api/state
+    numInstances: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: PYTHON_DOTENV_DISABLED
+        value: "1"
+      - key: TELEGRAM_ENABLED
+        value: "0"
+      - key: ROOM_DATABASE
+        value: /var/data/rooms.sqlite3
+    disk:
+      name: room-data
+      mountPath: /var/data
+      sizeGB: 1
