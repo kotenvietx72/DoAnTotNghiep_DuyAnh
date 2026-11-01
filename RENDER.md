@@ -2,18 +2,9 @@
 
 Repository: https://github.com/kotenvietx72/DoAnTotNghiep_DuyAnh
 
-## Cách nhanh: Blueprint
+## Khuyến nghị: tạo Web Service Free trực tiếp
 
-1. Đăng nhập [Render](https://dashboard.render.com/) bằng tài khoản của chủ repository, kết nối GitHub.
-2. Chọn **New → Blueprint**, chọn repository này và nhánh `main`.
-3. Render đọc `render.yaml` ở gốc repository. Kiểm tra dịch vụ có **Instance Type: Free**, không có disk hoặc database trả phí, rồi tạo dịch vụ.
-4. Chờ dịch vụ báo **Live**, mở địa chỉ HTTPS `onrender.com` Render cấp và chia sẻ.
-
-Blueprint hiện dùng **`plan: free`**, không tạo persistent disk hoặc database trả phí. Blueprint là cách khai báo cấu hình; chi phí phụ thuộc các tài nguyên được tạo. Dịch vụ này miễn phí trong hạn mức của [Render Free](https://render.com/docs/free). Sau lần thiết lập này, mỗi lần push vào `main`, Render tự build và triển khai bản mới.
-
-Nếu đã tạo dịch vụ hoặc disk trả phí từ cấu hình cũ, kiểm tra các tài nguyên đó trong Dashboard và sao lưu dữ liệu cần giữ trước khi tự dừng/xóa hoặc chuyển gói. Chỉ cập nhật YAML không đảm bảo tài nguyên trả phí cũ đã được xóa.
-
-## Cách nhập cấu hình bằng tay: Web Service
+Nếu màn hình Blueprint yêu cầu thêm thẻ, quay lại Dashboard và thử tạo **Web Service** trực tiếp theo các bước dưới đây. `plan: free` chỉ chọn gói dịch vụ, không đảm bảo luồng Blueprint hoặc tài khoản sẽ bỏ qua bước thêm/xác minh thẻ. Không cần Blueprint để tự cập nhật khi push GitHub.
 
 Chọn **New → Web Service → Git Provider**, kết nối GitHub và chọn repository. Cần kết nối tài khoản GitHub để có Auto Deploy; cách dán URL public đơn thuần không bật tính năng này.
 
@@ -40,6 +31,16 @@ Chọn **New → Web Service → Git Provider**, kết nối GitHub và chọn r
 | `TELEGRAM_ENABLED` | `0` khi chưa cấu hình Telegram |
 
 Không ghi đè biến `PORT` do Render cấp. Gói Free không hỗ trợ persistent disk; cấu hình này lưu SQLite trong thư mục tạm thời của dịch vụ.
+
+Nhấn **Deploy Web Service**, chờ trạng thái **Live**, rồi mở địa chỉ HTTPS `onrender.com` được cấp. Các lần push tiếp theo vào `main` tự kích hoạt build và triển khai khi Auto-Deploy là **On Commit**.
+
+Nếu luồng **Web Service → Free** vẫn yêu cầu thẻ, cần xem nguyên văn thông báo để xác định nguyên nhân; không thể kết luận chỉ sửa YAML sẽ bỏ được yêu cầu đó. [Hướng dẫn chính thức](https://render.com/docs/your-first-deploy) hỗ trợ tạo Web Service bằng tài nguyên Free.
+
+## Blueprint là lựa chọn bổ sung
+
+File `render.yaml` vẫn có sẵn với **`plan: free`**, không khai báo disk hoặc database trả phí. Có thể dùng **New → Blueprint → chọn repository và nhánh `main`** nếu chấp nhận các bước xác minh mà Render hiển thị. Không cần dùng cách này cho hướng dẫn Web Service ở trên.
+
+Nếu đã tạo dịch vụ hoặc disk trả phí từ cấu hình cũ, kiểm tra các tài nguyên đó trong Dashboard và sao lưu dữ liệu cần giữ trước khi tự dừng/xóa hoặc chuyển gói. Chỉ cập nhật YAML không đảm bảo tài nguyên trả phí cũ đã được xóa.
 
 ## Giới hạn của Free
 
@@ -81,4 +82,4 @@ Render tự cập nhật khi push vào nhánh `main`. Nếu build thất bại, 
 - Khi triển khai lại hoặc đánh thức dịch vụ, kết nối Socket.IO sẽ phải kết nối lại.
 - Bản demo hiện dùng chung công tắc và cài đặt cho mọi khách truy cập, chưa có đăng nhập hoặc phân quyền chỉ xem.
 
-Nguồn: [Render Free](https://render.com/docs/free), [Render Blueprint](https://render.com/docs/blueprint-spec), [Render Web Services](https://render.com/docs/web-services), [Auto Deploy](https://render.com/docs/deploys), [Flask-SocketIO Deployment](https://flask-socketio.readthedocs.io/en/latest/deployment.html).
+Nguồn: [Your First Render Deploy](https://render.com/docs/your-first-deploy), [Render Free](https://render.com/docs/free), [Render Blueprint](https://render.com/docs/blueprint-spec), [Render Web Services](https://render.com/docs/web-services), [Auto Deploy](https://render.com/docs/deploys), [Flask-SocketIO Deployment](https://flask-socketio.readthedocs.io/en/latest/deployment.html).
