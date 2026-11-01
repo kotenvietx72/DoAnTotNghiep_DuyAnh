@@ -1,4 +1,4 @@
-# Triển khai lên Render
+# Triển khai lên Render Free
 
 Repository: https://github.com/kotenvietx72/DoAnTotNghiep_DuyAnh
 
@@ -6,10 +6,12 @@ Repository: https://github.com/kotenvietx72/DoAnTotNghiep_DuyAnh
 
 1. Đăng nhập [Render](https://dashboard.render.com/) bằng tài khoản của chủ repository, kết nối GitHub.
 2. Chọn **New → Blueprint**, chọn repository này và nhánh `main`.
-3. Render đọc `render.yaml` ở gốc repository. Kiểm tra cấu hình và chi phí rồi tạo dịch vụ.
+3. Render đọc `render.yaml` ở gốc repository. Kiểm tra dịch vụ có **Instance Type: Free**, không có disk hoặc database trả phí, rồi tạo dịch vụ.
 4. Chờ dịch vụ báo **Live**, mở địa chỉ HTTPS `onrender.com` Render cấp và chia sẻ.
 
-Blueprint dùng **dịch vụ trả phí 0.5c-512mb và persistent disk 1 GB** để giữ SQLite. Tham khảo [giá hiện tại](https://render.com/pricing). Sau lần thiết lập này, mỗi lần push vào `main`, Render tự build và triển khai bản mới.
+Blueprint hiện dùng **`plan: free`**, không tạo persistent disk hoặc database trả phí. Blueprint là cách khai báo cấu hình; chi phí phụ thuộc các tài nguyên được tạo. Dịch vụ này miễn phí trong hạn mức của [Render Free](https://render.com/docs/free). Sau lần thiết lập này, mỗi lần push vào `main`, Render tự build và triển khai bản mới.
+
+Nếu đã tạo dịch vụ hoặc disk trả phí từ cấu hình cũ, kiểm tra các tài nguyên đó trong Dashboard và sao lưu dữ liệu cần giữ trước khi tự dừng/xóa hoặc chuyển gói. Chỉ cập nhật YAML không đảm bảo tài nguyên trả phí cũ đã được xóa.
 
 ## Cách nhập cấu hình bằng tay: Web Service
 
@@ -20,6 +22,7 @@ Chọn **New → Web Service → Git Provider**, kết nối GitHub và chọn r
 | Branch | `main` |
 | Region | Singapore |
 | Language | Python 3 |
+| Instance Type | Free |
 | Root Directory | `duy anh` |
 | Build Command | `pip install -r requirements.txt` |
 | Start Command | `gunicorn --worker-class gthread --workers 1 --threads 20 --bind 0.0.0.0:$PORT app:app` |
@@ -27,16 +30,23 @@ Chọn **New → Web Service → Git Provider**, kết nối GitHub và chọn r
 | Health Check Path | `/api/state` |
 | Instances | 1 |
 
-Thêm persistent disk 1 GB, mount path `/var/data`, rồi đặt các biến tại **Environment**:
+Đặt các biến tại **Environment**:
 
 | Biến | Giá trị |
 |---|---|
 | `PYTHON_VERSION` | `3.12.14` |
 | `PYTHON_DOTENV_DISABLED` | `1` |
-| `ROOM_DATABASE` | `/var/data/rooms.sqlite3` |
+| `ROOM_DATABASE` | `data/rooms.sqlite3` |
 | `TELEGRAM_ENABLED` | `0` khi chưa cấu hình Telegram |
 
-Không ghi đè biến `PORT` do Render cấp. Gói Free không hỗ trợ persistent disk, có thể ngủ khi không có truy cập và không giữ SQLite qua các lần khởi động lại.
+Không ghi đè biến `PORT` do Render cấp. Gói Free không hỗ trợ persistent disk; cấu hình này lưu SQLite trong thư mục tạm thời của dịch vụ.
+
+## Giới hạn của Free
+
+- Sau **15 phút không nhận truy cập**, dịch vụ ngủ. Lượt truy cập tiếp theo đánh thức web, thường mất khoảng **một phút**.
+- Dữ liệu SQLite, gồm công tắc và cấu hình đã chỉnh trên web, **mất khi dịch vụ ngủ, khởi động lại hoặc triển khai bản mới**. Khi mở lại, ứng dụng tạo cấu hình mặc định. Lịch sử lấy mẫu trong RAM cũng bắt đầu lại.
+- Workspace có **750 giờ dịch vụ Free mỗi tháng**, dùng chung cho các dịch vụ Free đang chạy. Băng thông và thời gian build cũng có hạn mức; xem **Usage / Billing** để theo dõi.
+- Phù hợp chia sẻ và trình diễn đồ án khi chấp nhận dữ liệu tạm. Giữ dữ liệu lâu dài cần bổ sung nơi lưu trữ bên ngoài; bản hiện tại chưa có tích hợp này.
 
 ## Telegram
 
@@ -66,9 +76,9 @@ Render tự cập nhật khi push vào nhánh `main`. Nếu build thất bại, 
 ## Dữ liệu và phạm vi bản demo
 
 - SQLite trên server là dữ liệu riêng, không tự sao chép từ SQLite trên máy Windows. Lần triển khai đầu tạo cấu hình mặc định.
-- Persistent disk giữ cấu hình và công tắc trong SQLite. Lịch sử lấy mẫu nằm trong RAM, bắt đầu lại khi tiến trình khởi động lại.
+- Bản Free dùng SQLite tạm thời. Công tắc, cấu hình và lịch sử lấy mẫu trên server không được giữ qua các lần khởi động lại.
 - Chỉ chạy **một instance, một Gunicorn worker** vì trạng thái mô phỏng và Socket.IO đang dùng chung bộ nhớ trong tiến trình.
-- Khi triển khai lại với persistent disk, web có thể gián đoạn ngắn và kết nối Socket.IO sẽ phải kết nối lại.
+- Khi triển khai lại hoặc đánh thức dịch vụ, kết nối Socket.IO sẽ phải kết nối lại.
 - Bản demo hiện dùng chung công tắc và cài đặt cho mọi khách truy cập, chưa có đăng nhập hoặc phân quyền chỉ xem.
 
-Nguồn: [Render Web Services](https://render.com/docs/web-services), [Auto Deploy](https://render.com/docs/deploys), [Persistent Disks](https://render.com/docs/disks), [Flask-SocketIO Deployment](https://flask-socketio.readthedocs.io/en/latest/deployment.html).
+Nguồn: [Render Free](https://render.com/docs/free), [Render Blueprint](https://render.com/docs/blueprint-spec), [Render Web Services](https://render.com/docs/web-services), [Auto Deploy](https://render.com/docs/deploys), [Flask-SocketIO Deployment](https://flask-socketio.readthedocs.io/en/latest/deployment.html).

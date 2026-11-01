@@ -8,7 +8,7 @@
 - Hai file JavaScript vượt qua `node --check`.
 - Đã quét nội dung chuẩn bị commit, bao gồm dữ liệu bên trong file Excel mẫu: không chứa token/chat ID thật hoặc các mẫu secret được kiểm tra. `.env`, virtualenv, SQLite và ZIP sao lưu được loại khỏi Git.
 - Bộ kiểm thử trên máy này dùng thư mục tạm trong `test-results/tmp` vì sandbox Windows hạn chế SQLite ở thư mục Temp mặc định; không thay đổi SQLite thật.
-- Cấu hình Render dùng một Gunicorn worker với threading, nhận `PORT` từ Render và đặt SQLite tại `/var/data/rooms.sqlite3` trên persistent disk.
+- Cấu hình Render đã đổi sang `plan: free`, không có persistent disk hoặc database trả phí; dùng một Gunicorn worker với threading và nhận `PORT` từ Render. SQLite tại `data/rooms.sqlite3` là dữ liệu tạm trên Render Free, không giữ qua các lần ngủ/khởi động lại/triển khai lại.
 - GitHub Actions được cấu hình để chạy kiểm thử, kiểm tra JavaScript và thử khởi động Gunicorn trên Linux sau khi push. Chưa thao tác triển khai dịch vụ Render.
 
 ## Kiểm thử tự động
