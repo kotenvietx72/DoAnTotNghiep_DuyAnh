@@ -1,5 +1,12 @@
 # Kết quả kiểm tra
 
+## Bổ sung lý do lỗi Telegram — 02/11/2026
+
+- Bắt riêng `requests.HTTPError`, ghi HTTP status, mã lỗi API, mô tả đã lọc bí mật và số giây `retry_after` khi API có trả. Không ghi nguyên văn exception hoặc toàn bộ body; HTML/JSON sai dạng có mô tả dự phòng.
+- Lọc URL, token, chat ID và dạng URL-encoded trước khi giới hạn độ dài mô tả; làm phẳng ký tự điều khiển để log luôn một dòng.
+- **44/44 unittest Python đạt**, gồm **9 bài Telegram** với lỗi 400/401/403/429/500, phản hồi không JSON, JSON sai dạng, lọc bí mật, log injection và URL encoding. **8/8 kiểm thử JavaScript đạt**; `git diff --check` đạt.
+- Tất cả request Telegram trong test được mock; không gửi tin thật. Đây là thay đổi phục vụ chẩn đoán, chưa khẳng định đã sửa nguyên nhân HTTPError trên Render; không đổi cờ cấu hình, người nhận, timeout hoặc cơ chế thử lại.
+
 ## Triển khai bố cục ba phòng đã duyệt — 02/11/2026
 
 - Đã đưa bộ bố trí đã duyệt vào `static/js/room-model.js`, dùng chung cho Home và chi tiết. Giữ đủ 33 thiết bị và ID; mã ngắn trên sơ đồ có mã tương ứng cạnh tên đầy đủ trong danh sách.

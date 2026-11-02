@@ -52,6 +52,8 @@ $env:TELEGRAM_ENABLED = '0'
 
 Thông tin Telegram được đọc từ biến môi trường hoặc file `.env` nằm cạnh `app.py`. Trên máy mới, sao chép `.env.example` thành `.env`, điền `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` và đặt `TELEGRAM_ENABLED=1` khi cần gửi thông báo. Không đưa `.env` lên Git. Biến môi trường có sẵn được ưu tiên hơn file `.env`.
 
+Nếu Telegram trả lỗi HTTP, log hiển thị `HTTP`, `error_code`, `lý do` từ phản hồi API và `retry_after` nếu có. Ví dụ định dạng: `HTTP=400; error_code=400; lý do=Bad Request: chat not found`. URL, token và chat ID được lọc khỏi mô tả; phản hồi không phải JSON có thông báo dự phòng. Dòng log này giúp chẩn đoán lỗi thực tế, chưa bổ sung cơ chế retry tự động.
+
 Hướng dẫn đưa web lên Internet, giữ SQLite và tự triển khai khi push: [RENDER.md](../RENDER.md).
 
 `simulate_sensor.py` là bộ phát MQTT riêng của bản gốc; web hiện không nhận dữ liệu từ script này.

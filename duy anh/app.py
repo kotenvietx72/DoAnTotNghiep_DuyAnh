@@ -11,7 +11,9 @@ import logging
 import math
 import uuid
 import sqlite3
+import re
 from pathlib import Path
+from urllib.parse import quote
 from dotenv import load_dotenv
 import pandas as pd
 import requests
@@ -47,6 +49,39 @@ last_sample_time = None
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
+
+def log_telegram_failure(response, error_type):
+    """Ghi lý do API nhưng không ghi URL, thông tin nhận hoặc khóa xác thực."""
+    status = response.status_code if response is not None else None
+    status = status if type(status) is int else "không rõ"
+    data = {}
+    if response is not None:
+        try:
+            data = response.json()
+        except ValueError:
+            pass
+    if not isinstance(data, dict):
+        data = {}
+    code = data.get("error_code")
+    code = code if type(code) is int else "không rõ"
+    description = data.get("description")
+    if not isinstance(description, str) or not description.strip():
+        description = "Phản hồi không có mô tả lỗi JSON."
+    # Lọc trước khi rút gọn để không giữ lại một phần token dài ở cuối log.
+    description = re.sub(r'https?://[^\s<>"\']+', "[URL đã ẩn]", description, flags=re.IGNORECASE)
+    for secret in (TELEGRAM_TOKEN, TELEGRAM_CHAT_ID):
+        if secret:
+            for value in (secret, quote(secret, safe="")):
+                description = re.sub(re.escape(value), "[đã ẩn]", description, flags=re.IGNORECASE)
+    description = re.sub(r"\b\d{5,15}:[A-Za-z0-9_-]{20,}\b", "[token đã ẩn]", description)
+    description = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", description).split())[:240]
+    parameters = data.get("parameters")
+    retry_after = parameters.get("retry_after") if isinstance(parameters, dict) else None
+    retry_note = f"; retry_after={retry_after}s" if type(retry_after) is int and retry_after >= 0 else ""
+    logger.warning("Không gửi được cảnh báo Telegram (%s): HTTP=%s; error_code=%s; lý do=%s%s",
+                   error_type, status, code, description, retry_note)
+
+
 def send_telegram_alert(message):
     """Hàm chạy ngầm gửi tin nhắn đến Telegram"""
     if (os.environ.get("TELEGRAM_ENABLED", "1") != "1"
@@ -59,9 +94,13 @@ def send_telegram_alert(message):
         "text": message,
         "parse_mode": "HTML"
     }
+    response = None
     try:
         response = requests.post(url, json=payload, timeout=3)
         response.raise_for_status()
+    except requests.HTTPError as error:
+        # Response lỗi có giá trị bool False; phải kiểm tra None thay vì dùng `or`.
+        log_telegram_failure(error.response if error.response is not None else response, type(error).__name__)
     except Exception as e:
         # Exception của requests có thể chứa URL kèm token; chỉ ghi tên loại lỗi.
         logger.warning("Không gửi được cảnh báo Telegram (%s).", type(e).__name__)
