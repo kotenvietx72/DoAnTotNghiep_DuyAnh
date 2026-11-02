@@ -13,6 +13,7 @@
   const roomCharts = {};
   let state = null, lastRevision = -1, lastSampleRevision = -1;
   let settingsRendered = false, settingsDirty = false;
+  let settingsBusy = false, settingsFingerprint = '', pendingRoom = false;
   let currentChart = null, voltageChart = null, globalReportData = null;
   let aggregateCurrentChart = null, online = false, pollTimer = null;
   const nf = new Intl.NumberFormat('vi-VN', {maximumFractionDigits:1});
@@ -28,12 +29,21 @@
     setTimeout(() => item.remove(), 5000);
   }
   async function api(url, options={}) {
-    const response = await fetch(url, {cache:'no-store', ...options});
-    let data;
-    try { data = await response.json(); }
-    catch { throw new Error('Máy chủ trả về dữ liệu không hợp lệ. Vui lòng thử lại.'); }
-    if (!response.ok || data.success === false) throw new Error(data.error || 'Không thực hiện được yêu cầu.');
-    return data;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      let response, data;
+      try {
+        response = await fetch(url, {cache:'no-store', ...options, signal:controller.signal});
+        data = await response.json();
+      } catch {
+        const error = new Error('Chưa xác định được kết quả từ máy chủ. Đang đồng bộ lại trạng thái.');
+        error.uncertain = true;
+        throw error;
+      }
+      if (!response.ok || data.success === false) throw new Error(data.error || 'Không thực hiện được yêu cầu.');
+      return data;
+    } finally { clearTimeout(timeout); }
   }
   const jsonOptions = (method, data) => ({method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
   function setConnection(value) {
@@ -41,6 +51,7 @@
     $('connectionStatus').className = `connection ${value?'':'offline'}`;
     $('connectionStatus').innerHTML = `<span class="online-dot"></span>${value?'Đã kết nối':'Đang kết nối lại'}`;
     if (state && roomId) renderRoom(state.rooms[roomId]);
+    if (page === 'settings') setSettingsBusy(settingsBusy);
   }
   function chartOptions() {
     return {responsive:true, maintainAspectRatio:false, animation:false,
@@ -161,21 +172,24 @@
     if (!model.children.length) model.innerHTML = RoomModel.render(room,true);
     const list = $('deviceList');
     if (!list.children.length) {
-      list.innerHTML = room.devices.map(item => `<div class="device-row" id="row-${item.id}"><span class="device-type-icon">${RoomModel.deviceIcon(item.kind)}</span><div class="device-info"><strong>${esc(item.name)}</strong><small id="info-${item.id}"></small></div><button type="button" role="switch" aria-checked="false" aria-label="${esc(item.name)}" class="switch" data-device="${item.id}"></button></div>`).join('');
+      list.innerHTML = room.devices.map(item => `<div class="device-row" id="row-${item.id}"><span class="device-type-icon">${RoomModel.deviceIcon(item.kind,item.id)}</span><div class="device-info"><strong><span class="device-code">${esc(RoomModel.deviceCode(room.kind,item.id))}</span>${esc(item.name)}</strong><small id="info-${item.id}"></small></div><button type="button" role="switch" aria-checked="false" aria-label="${esc(item.name)}" class="switch" data-device="${item.id}"></button></div>`).join('');
     }
-    const disabled = !online || state?.mode !== 'devices';
+    const disabled = !online || state?.mode !== 'devices' || pendingRoom;
+    const allButton = $('allDevicesOn');
+    allButton.disabled = disabled || pendingDevices.size > 0 || room.active_count === room.devices.length;
+    allButton.textContent = pendingRoom ? 'Đang bật…' : 'Bật tất cả';
     for (const item of room.devices) {
-      const pending = pendingDevices.has(item.id);
+      const pending = pendingRoom || pendingDevices.has(item.id);
       $(`row-${item.id}`).classList.toggle('is-on',item.is_on);
       $(`info-${item.id}`).textContent = `${num(item.current_a,3)} A · ${pending?'Đang cập nhật…':item.is_on?'Đang bật':'Đang tắt'}`;
       const control = list.querySelector(`[data-device="${item.id}"]`);
       control.setAttribute('aria-checked',String(item.is_on));
       control.disabled = disabled || pending;
     }
-    RoomModel.update(model,room,disabled);
+    RoomModel.update(model,room,disabled,pendingDevices);
   }
   async function toggleDevice(deviceId) {
-    if (!state || pendingDevices.has(deviceId) || !online) return;
+    if (!state || pendingRoom || pendingDevices.has(deviceId) || !online) return;
     if (state.mode !== 'devices') return toast('Hãy chuyển sang chế độ Theo thiết bị tại trang Tổng quan.','warning');
     const item = state.rooms[roomId].devices.find(item => item.id === deviceId);
     if (!item) return;
@@ -183,16 +197,63 @@
     renderRoom(state.rooms[roomId]);
     try {
       acceptState(await api(`/api/rooms/${roomId}/devices/${deviceId}`,jsonOptions('POST',{is_on:!item.is_on})));
-    } catch (error) { toast(error.message,'error'); }
+    } catch (error) { toast(error.message,'error'); if (error.uncertain) await refresh(); }
     finally { pendingDevices.delete(deviceId); renderRoom(state.rooms[roomId]); }
   }
-  function renderSettings(rooms) {
-    if (settingsRendered) return;
+  async function turnAllDevicesOn() {
+    if (!state || !online || pendingRoom || pendingDevices.size || state.mode !== 'devices') return;
+    pendingRoom = true;
+    renderRoom(state.rooms[roomId]);
+    try {
+      acceptState(await api(`/api/rooms/${roomId}/devices`,jsonOptions('POST',{is_on:true})));
+      toast('Đã bật tất cả thiết bị trong phòng.');
+    } catch (error) { toast(error.message,'error'); if (error.uncertain) await refresh(); }
+    finally { pendingRoom = false; renderRoom(state.rooms[roomId]); }
+  }
+  function setSettingsBusy(value) {
+    settingsBusy = value;
+    document.querySelectorAll('#saveSettings,#resetSettings,#confirmReset,#settingsForm input').forEach(control => {
+      control.disabled = value || !online || !state;
+    });
+    $('settingsForm')?.setAttribute('aria-busy',String(value));
+  }
+  function renderSettings(rooms, force=false) {
+    const fingerprint = JSON.stringify(Object.values(rooms).map(room => [room.id,room.thresh_warn,room.thresh_danger,
+      room.devices.map(item => [item.id,item.current_a])]));
+    if (!force && settingsRendered) {
+      if (settingsBusy || settingsFingerprint === fingerprint) return;
+      if (settingsDirty) {
+        $('settingsMessage').textContent = 'Cấu hình máy chủ đã thay đổi. Bản nháp của bạn được giữ; lưu sẽ áp dụng các giá trị đang nhập.';
+        return;
+      }
+    }
     $('settingsRooms').innerHTML = Object.values(rooms).map(room => `<section class="panel settings-room" data-settings-room="${room.id}"><div class="settings-room-heading"><h2>${esc(room.name)}</h2></div><div class="threshold-fields"><div><label class="field-label" for="${room.id}-warn">Ngưỡng cảnh báo</label><div class="input-unit"><input id="${room.id}-warn" data-field="thresh_warn" type="number" min="0.01" max="1000" step="0.01" value="${room.thresh_warn}" required><span>A</span></div></div><div><label class="field-label" for="${room.id}-danger">Ngưỡng nguy hiểm</label><div class="input-unit"><input id="${room.id}-danger" data-field="thresh_danger" type="number" min="0.01" max="1000" step="0.01" value="${room.thresh_danger}" required><span>A</span></div></div></div><h3 class="settings-device-title">Dòng điện thiết bị</h3><div class="setting-device-grid">${room.devices.map(item => `<div><label class="field-label" for="${room.id}-${item.id}-current">${esc(item.name)}</label><div class="input-unit"><input id="${room.id}-${item.id}-current" data-current-device="${item.id}" type="number" min="0" max="1000" step="any" value="${item.current_a}" required><span>A</span></div></div>`).join('')}</div></section>`).join('');
     settingsRendered = true;
+    settingsFingerprint = fingerprint;
+    setSettingsBusy(settingsBusy);
+  }
+  async function commitSettings(url, options, message) {
+    if (settingsBusy || !online || !state) return;
+    setSettingsBusy(true);
+    try {
+      acceptState(await api(url,options));
+      settingsDirty = false;
+      renderSettings(state.rooms,true);
+      $('settingsMessage').textContent = message;
+      toast(message);
+    } catch (error) {
+      toast(error.message,'error');
+      // Giữ bản nháp kể cả khi lệnh có thể đã thành công nhưng mất phản hồi.
+      if (error.uncertain) {
+        settingsDirty = true;
+        await refresh();
+        $('settingsMessage').textContent = 'Kết quả chưa xác định. Bản nháp được giữ; tải lại trang để xem cấu hình mới nhất.';
+      }
+    } finally { setSettingsBusy(false); }
   }
   async function saveSettings(event) {
     event.preventDefault();
+    if (settingsBusy || !online || !state) return;
     const form = $('settingsForm');
     if (!form.reportValidity()) return;
     const payload = {rooms:{}};
@@ -206,15 +267,7 @@
       for (const input of section.querySelectorAll('[data-current-device]')) cfg.devices[input.dataset.currentDevice] = Number(input.value);
       payload.rooms[section.dataset.settingsRoom] = cfg;
     }
-    const buttons = document.querySelectorAll('[form="settingsForm"],#settingsForm button[type="submit"]');
-    buttons.forEach(button => button.disabled = true);
-    try {
-      acceptState(await api('/api/settings',jsonOptions('PUT',payload)));
-      settingsDirty = false;
-      $('settingsMessage').textContent = `Đã lưu cấu hình lúc ${new Date().toLocaleTimeString('vi-VN')}.`;
-      toast('Đã lưu cài đặt. Tải điện và cảnh báo đã được cập nhật.');
-    } catch (error) { toast(error.message,'error'); }
-    finally { buttons.forEach(button => button.disabled = false); }
+    await commitSettings('/api/settings',jsonOptions('PUT',payload),'Đã lưu cài đặt. Tải điện và cảnh báo đã được cập nhật.');
   }
   function acceptState(data) {
     if (!data || !data.rooms) return;
@@ -252,7 +305,7 @@
   }
   function receiveSample(data) {
     acceptState(data);
-    if (!data.is_simulating || data.revision <= lastSampleRevision) return;
+    if (data.server_id !== state?.server_id || data.revision < lastRevision || !data.is_simulating || data.revision <= lastSampleRevision) return;
     lastSampleRevision = data.revision;
     if (aggregateCurrentChart) {
       aggregateCurrentChart.data.labels.push(data.timestamp);
@@ -355,6 +408,15 @@
   $('exportReport')?.addEventListener('click',downloadPDFReport);
   $('btnDownloadPDF')?.addEventListener('click',downloadPDFReport);
   $('settingsForm')?.addEventListener('submit',saveSettings);
+  $('allDevicesOn')?.addEventListener('click',turnAllDevicesOn);
+  $('resetSettings')?.addEventListener('click',()=>{
+    if (state && online && !settingsBusy) $('resetSettingsDialog').showModal();
+  });
+  $('cancelReset')?.addEventListener('click',()=> $('resetSettingsDialog').close());
+  $('confirmReset')?.addEventListener('click',()=>{
+    $('resetSettingsDialog').close();
+    commitSettings('/api/settings/reset',jsonOptions('POST',{}),'Đã khôi phục ngưỡng và dòng điện mặc định của ba phòng.');
+  });
   $('settingsForm')?.addEventListener('input',()=>{ settingsDirty = true; $('settingsMessage').textContent = 'Có thay đổi chưa được lưu.'; });
   $('analysisForm')?.addEventListener('submit',uploadAndAnalyze);
   $('analysisRoom')?.addEventListener('change',updateAnalysisThresholds);
@@ -368,6 +430,8 @@
   }
   $('roomModel')?.addEventListener('click',modelAction);
   $('roomModel')?.addEventListener('keydown',event=>{
+    // Nút HTML tự phát click bằng bàn phím; chỉ giữ xử lý cũ cho phần tử SVG cũ.
+    if (event.target.closest('button[data-model-device]')) return;
     if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); modelAction(event);}
   });
   async function refresh() {

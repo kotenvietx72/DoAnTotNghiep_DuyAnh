@@ -21,3 +21,36 @@
 @media(max-width:960px){.brand{margin-bottom:14px}.topbar{height:42px}.room-preview{height:185px}}
 @media(max-width:700px){.topbar{height:35px}.main-content{padding-top:22px}.metric-card{padding:15px}.room-preview,.room-card[data-room=r2] .room-preview,.room-card[data-room=r3] .room-preview{height:auto;aspect-ratio:820 / 560}.room-card h3{font-size:20px}.room-card-heading{padding:18px 19px 0}.room-model-large{height:auto}.model-panel{padding:16px}.device-list{max-height:none}.settings-device-title{font-size:13px}.device-info strong{font-size:12px}}
 @media(max-width:700px){.room-detail-metrics .compact-metric:nth-child(2) strong{font-size:23px}}
+.settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.settings-dialog{width:min(480px,calc(100% - 36px));max-height:calc(100% - 36px);overflow:auto;padding:24px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}.settings-dialog::backdrop{background:var(--ink);opacity:.4}.settings-dialog p{font-size:14px;line-height:1.7;margin:16px 0 24px;color:var(--muted)}.settings-dialog .settings-actions{justify-content:flex-end}.device-panel .button{font-size:11px;min-height:40px;padding:8px 12px}@media(max-width:700px){.settings-actions{width:100%}.settings-actions .button{flex:1;justify-content:center}.settings-dialog{padding:20px}.settings-dialog h2{font-size:20px}}
+/* Mô hình đã duyệt: cùng tọa độ cho Home/chi tiết, kích thước icon độc lập với mặt bằng. */
+:root{--model-floor:#f8faf8;--model-wall:#648577;--model-wood:#e8dbc4;--model-chair:#91afa1}
+.room-model-large{height:auto;aspect-ratio:1000/760;min-height:470px;background:var(--model-floor);overflow:visible}
+.room-scene{position:relative;width:100%;height:100%;background:var(--model-floor);isolation:isolate}
+.room-scene>.model-plan{position:absolute;inset:0;width:100%;height:100%;stroke:none;fill:none}
+.model-wall{fill:none;stroke:var(--model-wall);stroke-width:8;stroke-linecap:square;stroke-linejoin:round}
+.model-door{fill:none;stroke:var(--model-wall);stroke-width:2}
+.model-furniture{fill:var(--model-wood);stroke:var(--model-wall);stroke-width:1.5}
+.model-chair{fill:var(--model-chair);stroke:var(--model-wall);stroke-width:1.4}
+.model-route,.model-blanket{fill:var(--green-soft);stroke:none}
+.model-bedding{fill:var(--surface);stroke:none}
+.model-board{fill:var(--green);stroke:none}
+.model-window{stroke:var(--surface);stroke-width:10}
+.model-window-line{stroke:var(--model-chair);stroke-width:3}
+.room-scene .model-zone{position:absolute;transform:translate(-50%,-50%);font-size:11px;color:var(--muted);white-space:nowrap;pointer-events:none}
+.room-scene .model-board-label{color:var(--surface)}
+.room-model .model-device{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;width:44px;min-height:50px;padding:0;border:0;background:transparent;z-index:1;font:inherit;color:var(--ink)}
+.room-model .model-device .device-symbol{display:grid;place-items:center;width:32px;height:32px;flex-shrink:0;border:1.5px solid var(--model-wall);border-radius:9px;background:var(--surface);color:var(--green)}
+.room-model .model-device .device-symbol svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.5}
+.room-model .model-device-label{font:600 11px/15px Inter,Segoe UI,Arial,sans-serif;white-space:nowrap;background:var(--model-floor);color:var(--ink);padding:0 3px;border-radius:3px}
+.room-model .model-device.device-on .device-symbol{background:var(--green-soft);border-color:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+.room-model .model-control:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:8px}
+.room-model .model-control:disabled{cursor:not-allowed;opacity:1}
+.device-code{display:inline-block;min-width:30px;margin-right:6px;padding:1px 4px;border-radius:4px;color:var(--green);background:var(--green-soft);font-size:10px;text-align:center}
+.room-preview{background:var(--model-floor)}
+.room-preview .model-device{width:24px;height:24px;min-height:0;gap:0;pointer-events:none}
+.room-preview .model-device .device-symbol{width:21px;height:21px;border-radius:5px;border-width:1px}
+.room-preview .model-device .device-symbol svg{width:14px;height:14px}
+.room-preview .model-device-label,.room-preview .model-zone{display:none}
+.room-preview .model-device.device-on .device-symbol{box-shadow:none}
+@media(max-width:700px){.room-model-large{min-height:560px}.room-preview,.room-card[data-room=r2] .room-preview,.room-card[data-room=r3] .room-preview{aspect-ratio:1000/760}.room-model .model-device .device-symbol{width:30px;height:30px}.room-preview .model-device .device-symbol{width:21px;height:21px}}
+@media(max-width:700px){.room-scene [data-model-zone="KHU TẮM"],.room-scene [data-model-zone="KHU NƯỚC"]{max-width:18%;white-space:normal;text-align:center}}

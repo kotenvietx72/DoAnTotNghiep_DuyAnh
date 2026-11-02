@@ -1,4 +1,29 @@
-# Kết quả kiểm tra — 01/11/2026
+# Kết quả kiểm tra
+
+## Triển khai bố cục ba phòng đã duyệt — 02/11/2026
+
+- Đã đưa bộ bố trí đã duyệt vào `static/js/room-model.js`, dùng chung cho Home và chi tiết. Giữ đủ 33 thiết bị và ID; mã ngắn trên sơ đồ có mã tương ứng cạnh tên đầy đủ trong danh sách.
+- Phòng học: bàn giáo viên phía bảng, quạt giữa các dãy, Đ3/Đ6 dịch phải. Kí túc xá: cửa/lối đi ở trục giữa, giường và các cặp đèn/quạt/bàn đối xứng. Phòng bảo vệ: bàn trực hướng cửa sổ, quạt ngoài tủ, khu nước riêng. Vùng cửa chính không giao bàn, giường, ghế hoặc tủ.
+- Mô hình dùng nút HTML và lớp icon độc lập kích thước sơ đồ. Đã kiểm tra click, Enter và Space: đúng một POST mỗi lần, cập nhật đồng thời công tắc danh sách và client thứ hai. Nút đang chờ hoặc không khả dụng bị khóa; màu thiết bị theo state backend.
+- **40/40 unittest Python và 8/8 kiểm thử JavaScript đạt**; hai file JavaScript và diff vượt kiểm tra cú pháp/whitespace. CI chạy cả test controller và renderer.
+- **E2E giao diện thật đạt** bằng `tools/check_room_ui.cjs`: 12 trang chi tiết ở 1440/1024/390/320 px và Home ở bốn viewport. Đủ 33 icon, không có vùng bấm giao nhau, mỗi nút ít nhất 44 px, không tràn ngang; cửa không giao nội thất, đèn kí túc xá thẳng tâm giường và lối đi ở giữa. Bật tất cả, Socket.IO hai client, start/stop kịch bản và xác nhận/hủy reset Settings đạt; không có lỗi JavaScript.
+- Đã mở ảnh chụp desktop/mobile để kiểm tra trực quan; nhãn khu tắm/khu nước xuống dòng trong vùng riêng ở màn hình hẹp. Bằng chứng: `A:\DoAnTotNghiep_DuyAnh_docs\evidence\web-room-layout\` và `report.json`. Đây là ảnh web thật sau khi sửa code, khác ảnh thiết kế trong `design/`.
+- Backend, SQLite và profile Edge đều được tạo riêng cho test; Telegram tắt. Script đóng các process thử của nó sau khi chạy. Không dùng tab hoặc dữ liệu người dùng. PDF không nằm trong phạm vi thay đổi này và chưa kiểm tra trực quan lại.
+- Phần hạn chế truy cập trình duyệt ở mốc F21–F23 bên dưới là lịch sử; đợt này đã kiểm tra được UI bằng browser headless với profile mới. Không sửa Android nên không áp dụng Gradle cho thay đổi web.
+
+## F21–F23 — 02/11/2026
+
+- Đã triển khai bật tất cả riêng từng phòng, reset thông số mặc định có xác nhận và đồng bộ thiết bị với số đo trong kịch bản tự động.
+- **40/40 unittest Python đạt**, gồm 29 bài hiện có và 11 bài hồi quy mới. Đã kiểm tra ba phòng qua 45 mẫu có seed: tổng dòng/số thiết bị/trạng thái cùng khớp; chuyển về thủ công giữ nguyên trạng thái RAM và SQLite.
+- Kiểm thử API xác nhận thao tác hàng loạt chỉ ghi một lần, lặp lệnh không cộng trùng, các phòng độc lập; lỗi SQLite hoàn tác RAM và không publish hoặc ghi nhật ký thành công. Reset khôi phục đúng mặc định, giữ công tắc và lịch sử, làm mới tổ hợp mô phỏng mà không reset pha. Thời lượng trước/sau đổi tải được chia đúng.
+- Hai Socket.IO client nhận cùng state/revision của API mới; đọc state/báo cáo khi dừng không làm random lại. Kiểm thử chọn tổ hợp đối chiếu vét cạn với ngưỡng biên, mức không thể đạt, tổ hợp bằng tải, thiết bị 0 A và đổi cấu hình.
+- **5/5 kiểm thử controller JavaScript đạt** bằng Node VM với DOM/socket/HTTP giả lập: xác nhận/hủy reset, điền lại form sau thành công, giữ bản nháp khi tab khác thay cấu hình, đồng bộ sau mất phản hồi, một lệnh bật hàng loạt và khóa điều khiển khi đang gửi/mất kết nối/ở chế độ tự động. Đây là kiểm thử logic, không thay thế kiểm tra layout thật.
+- `node --check` cho hai file JavaScript và `git diff --check` đạt. CI được bổ sung lệnh chạy test controller.
+- Dùng `.venv/Scripts/python.exe`; TEMP/TMP đặt trong `test-results/tmp` cho SQLite tạm. Không thao tác database người dùng, không gửi Telegram thật. Bản thử HTTP dùng `127.0.0.1:5062` và SQLite riêng trong `test-results`.
+- **Chưa xác minh trực quan giao diện desktop/mobile hoặc PDF mới**: trình duyệt tích hợp không truy cập được địa chỉ cục bộ; Computer Use dừng vì không xác minh được URL Edge. Không đọc Google Sheets đang mở hoặc thao tác tiếp trên cửa sổ đó.
+- Thay đổi thuộc web Flask; không sửa Android nên không chạy Gradle assembleDebug/lint.
+
+Các phần dưới là bằng chứng của mốc **01/11/2026**, giữ để tham chiếu lịch sử.
 
 ## Chuẩn bị GitHub và Render
 

@@ -10,12 +10,14 @@ import os
 import logging
 import math
 import uuid
+import sqlite3
 from pathlib import Path
 from dotenv import load_dotenv
 import pandas as pd
 import requests
 from openpyxl.styles import Font, Alignment
 from room_service import ROOM_CONFIGS, RoomService, ValidationError, classify
+from simulation_service import SimulationService
 
 TAG = "app"
 logger = logging.getLogger(TAG)
@@ -33,6 +35,9 @@ simulation_thread = None
 simulation_stop = None
 simulation_mode = "devices"
 legacy_data = {}
+legacy_device_states = {}
+legacy_scenario_idx = 0
+simulation_service = SimulationService()
 state_revision = 0
 server_id = uuid.uuid4().hex
 last_sample_time = None
@@ -117,7 +122,8 @@ def account_runtime():
 
 
 def build_state():
-    rooms = room_service.snapshot(legacy_data if simulation_mode == "legacy" else None)
+    rooms = room_service.snapshot(legacy_data if simulation_mode == "legacy" else None,
+                                  legacy_device_states if simulation_mode == "legacy" else None)
     return {"server_id": server_id, "revision": state_revision, "timestamp": time.strftime("%H:%M:%S"),
             "is_simulating": is_simulating, "mode": simulation_mode,
             "total_current": round(math.fsum(room["current"] for room in rooms.values()), 6),
@@ -149,13 +155,23 @@ def publish_state(sample=False):
 
 
 def update_legacy_data(scenario_idx):
+    global legacy_scenario_idx, legacy_data, legacy_device_states
+    legacy_scenario_idx = scenario_idx
+    next_states = {}
     for index, (key, cfg) in enumerate(room_service.configs.items()):
         # Kịch bản cũ vẫn luân phiên 3 trạng thái, theo ngưỡng đang cài đặt.
         bases = (cfg["thresh_warn"] * .6,
                  (cfg["thresh_warn"] + cfg["thresh_danger"]) / 2,
                  cfg["thresh_danger"] * 1.15)
-        current = round(bases[(scenario_idx + index) % 3] * random.uniform(.99, 1.01), 4)
-        legacy_data[key] = (current, round(225 - current * .3, 1))
+        phase = (scenario_idx + index) % 3
+        current = round(bases[phase] * simulation_service.rng.uniform(.99, 1.01), 4)
+        previous = [key_id for key_id, value in legacy_device_states.get(key, {}).items() if value]
+        next_states[key] = simulation_service.select(key, room_service.devices[key], cfg, current,
+                                                    ("Safe", "Warning", "Danger")[phase], previous)
+    # Hoàn thành cả ba phòng trước khi công bố; không thay trạng thái đã lưu.
+    rooms = room_service.snapshot(device_states=next_states)
+    legacy_device_states = next_states
+    legacy_data = {key: (room["current"], round(225 - room["current"] * .3, 1)) for key, room in rooms.items()}
 
 
 def run_simulation(stop_event=None):
@@ -180,6 +196,8 @@ def toggle_simulation():
         raise ValidationError("Hành động không hợp lệ.")
     with state_lock:
         if data["action"] == "start" and not is_simulating:
+            if simulation_mode == "legacy":
+                update_legacy_data(0)
             history_stats = init_history()
             history_stats["started_at"] = time.strftime("%d/%m/%Y %H:%M:%S")
             history_stats["initial_configs"] = deepcopy(room_service.configs)
@@ -226,6 +244,32 @@ def set_device(room_id, device_id):
         return jsonify(publish_state())
 
 
+@app.route("/api/rooms/<room_id>/devices", methods=["POST"])
+def set_all_devices(room_id):
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ValidationError("Dữ liệu công tắc không hợp lệ.")
+    with state_lock:
+        if simulation_mode != "devices":
+            return jsonify(error="Hãy chuyển sang chế độ Theo thiết bị để điều khiển công tắc."), 409
+        account_runtime()
+        room_service.set_all_devices(room_id, data.get("is_on"))
+        return jsonify(publish_state())
+
+
+@app.route("/api/settings/reset", methods=["POST"])
+def reset_settings():
+    with state_lock:
+        account_runtime()
+        room_service.reset_settings()
+        change = f"[{time.strftime('%d/%m/%Y %H:%M:%S')}] Khôi phục ngưỡng và dòng điện mặc định của ba phòng."
+        history_stats["config_changes"].append(change)
+        history_stats["event_log"].append(change)
+        if simulation_mode == "legacy":
+            update_legacy_data(legacy_scenario_idx)
+        return jsonify(publish_state())
+
+
 @app.route("/api/settings", methods=["GET", "PUT"])
 def settings_api():
     with state_lock:
@@ -237,7 +281,7 @@ def settings_api():
             history_stats["config_changes"].append(change)
             history_stats["event_log"].append(change)
             if simulation_mode == "legacy":
-                update_legacy_data(0)
+                update_legacy_data(legacy_scenario_idx)
             return jsonify(publish_state())
         return jsonify(build_state())
 
@@ -354,6 +398,12 @@ def missing_resource(error):
 @app.errorhandler(413)
 def file_too_large(error):
     return jsonify(success=False, error="File vượt quá giới hạn 10 MB."), 413
+
+
+@app.errorhandler(sqlite3.Error)
+def storage_error(error):
+    logger.warning("Không lưu được cấu hình (%s).", type(error).__name__)
+    return jsonify(success=False, error="Không lưu được thay đổi. Cấu hình trước đó được giữ; vui lòng thử lại."), 500
 
 
 @app.route("/")

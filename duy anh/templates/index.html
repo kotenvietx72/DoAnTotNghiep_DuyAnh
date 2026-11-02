@@ -8,7 +8,7 @@
   <article class="metric-card"><div class="metric-title">Phòng cảnh báo <span class="metric-icon amber"><svg><use href="#icon-shield"/></svg></span></div><div class="metric-value" id="alertRooms">0 <small>phòng</small></div></article>
 </section>
 <section class="monitor-toolbar panel"><div class="monitor-state"><span class="monitor-indicator" id="monitorIndicator"></span><strong id="monitorLabel">Sẵn sàng giám sát</strong></div><div class="monitor-actions"><label class="mode-label" for="simulationMode">Chế độ</label><select id="simulationMode" aria-label="Chế độ mô phỏng"><option value="devices">Theo thiết bị</option><option value="legacy">Kịch bản tự động</option></select><button id="btnStart" class="button button-primary">▶ Khởi động lấy mẫu</button><button id="btnStop" class="button button-stop" disabled>■ Dừng</button></div></section>
-<div id="legacyNotice" class="notice notice-amber" hidden>Kịch bản tự động đang dùng số liệu giả lập. Chọn “Theo thiết bị” để dùng công tắc.</div>
+<div id="legacyNotice" class="notice notice-amber" hidden>Kịch bản tự động bật/tắt thiết bị theo mức tải mô phỏng. Dòng điện bằng tổng dòng các thiết bị đang bật. Dừng lấy mẫu và chọn “Theo thiết bị” để điều khiển thủ công.</div>
 <section class="section-heading"><h2>Các phòng</h2></section>
 <section id="roomCards" class="room-grid" aria-label="Ba phòng giám sát"></section>
 <section class="bottom-grid"><article class="panel chart-panel"><div class="panel-heading"><h2>Dòng điện theo thời gian (A)</h2></div><div class="chart-wrap"><canvas id="aggregateCurrentChart" aria-label="Đồ thị dòng điện ba phòng"></canvas></div></article></section>

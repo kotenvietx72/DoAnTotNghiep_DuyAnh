@@ -36,6 +36,8 @@ jobs:
         run: |
           node --check static/js/app.js
           node --check static/js/room-model.js
+      - name: Frontend controller regression tests
+        run: node --test tests/frontend.test.cjs tests/room-model.test.cjs
       - name: Gunicorn startup and API smoke test
         run: |
           gunicorn --worker-class gthread --workers 1 --threads 20 --bind 127.0.0.1:5000 app:app &

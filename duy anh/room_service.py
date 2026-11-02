@@ -193,16 +193,45 @@ class RoomService:
                 item["is_on"] = previous
                 raise
 
-    def snapshot(self, overrides=None):
+    def set_all_devices(self, room_id, is_on):
+        with self.lock:
+            if room_id not in self.devices:
+                raise KeyError("Phòng không tồn tại.")
+            if type(is_on) is not bool:
+                raise ValidationError("Trạng thái bật/tắt phải là true hoặc false.")
+            previous = [item["is_on"] for item in self.devices[room_id]]
+            for item in self.devices[room_id]:
+                item["is_on"] = is_on
+            try:
+                self._save()
+            except Exception:
+                for item, value in zip(self.devices[room_id], previous):
+                    item["is_on"] = value
+                raise
+
+    def reset_settings(self):
+        self.update_settings({"rooms": {key: {
+            "thresh_warn": cfg["thresh_warn"], "thresh_danger": cfg["thresh_danger"],
+            "devices": {item["id"]: item["current_a"] for item in DEFAULT_DEVICES[key]},
+        } for key, cfg in ROOM_CONFIGS.items()}})
+
+    def snapshot(self, overrides=None, device_states=None):
         with self.lock:
             rooms = {}
             for key, cfg in self.configs.items():
-                items = self.devices[key]
+                items = deepcopy(self.devices[key])
+                if device_states is not None:
+                    for item in items:
+                        item["is_on"] = device_states.get(key, {}).get(item["id"], False)
                 # Cộng số thập phân để 0.1 A + 0.7 A chạm đúng ngưỡng 0.8 A.
-                current = float(sum((Decimal(str(item["current_a"])) for item in items if item["is_on"]), Decimal(0)))
+                current = float(round(sum((Decimal(str(item["current_a"])) for item in items if item["is_on"]), Decimal(0)), 6))
                 voltage = 220.0
                 if overrides and key in overrides:
-                    current, voltage = overrides[key]
+                    # Giữ hợp đồng override cũ; mô phỏng đồng bộ luôn lấy dòng từ thiết bị.
+                    if device_states is None:
+                        current, voltage = overrides[key]
+                    else:
+                        voltage = overrides[key][1]
                 status, advice = classify(current, cfg)
                 rooms[key] = {**deepcopy(cfg), "id": key, "current": round(current, 6),
                               "voltage": voltage,

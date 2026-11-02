@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
+import random
 
 os.environ["TELEGRAM_ENABLED"] = "0"
 _import_database = tempfile.TemporaryDirectory()
@@ -16,6 +17,7 @@ os.environ["ROOM_DATABASE"] = str(Path(_import_database.name) / "import.sqlite3"
 
 import app as web
 from room_service import RoomService, ValidationError
+from simulation_service import SimulationService
 
 
 class LoadTests(unittest.TestCase):
@@ -126,6 +128,9 @@ class WebTests(unittest.TestCase):
         web.is_simulating = False
         web.simulation_mode = "devices"
         web.legacy_data = {}
+        web.legacy_device_states = {}
+        web.legacy_scenario_idx = 0
+        web.simulation_service = SimulationService(random.Random(42))
         web.state_revision = 0
         web.last_sample_time = None
         web.simulation_stop = None
