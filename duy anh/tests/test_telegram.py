@@ -157,6 +157,34 @@ class TelegramTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, "Fresh deployment could not start safely")
 
+    def test_default_timezone_is_vietnam(self):
+        self.assertEqual(web.APP_TIMEZONE, "Asia/Ho_Chi_Minh")
+        formatted = web.format_current_time("%d/%m/%Y %H:%M:%S")
+        self.assertRegex(formatted, r"^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$")
+
+    def test_timezone_switching_and_fallback(self):
+        # Khi chuyển sang UTC, giờ phải chênh lệch đúng 7 tiếng so với UTC+7
+        with patch.dict(os.environ, {"APP_TIMEZONE": "UTC"}):
+            utc_time = web.get_current_time()
+            self.assertEqual(utc_time.tzinfo.tzname(utc_time), "UTC")
+
+        # Khi cấu hình múi giờ không hợp lệ, fallback an toàn sang UTC+7 mà không gây lỗi
+        with patch.dict(os.environ, {"APP_TIMEZONE": "Invalid/Timezone"}):
+            fallback_time = web.get_current_time()
+            offset = fallback_time.utcoffset()
+            self.assertEqual(offset.total_seconds(), 7 * 3600)
+
+    def test_transition_notification_message_includes_formatted_timestamp(self):
+        rooms = {
+            "r1": {"name": "Phòng học", "status": "Warning", "current": 30.5, "voltage": 220.0}
+        }
+        with patch.object(web, "notify") as mock_notify:
+            web.history_stats["rooms"]["r1"]["last"] = "Safe"
+            web.record_transitions(rooms)
+            self.assertEqual(len(web.history_stats["event_log"]), 1)
+            event_msg = web.history_stats["event_log"][-1]
+            self.assertRegex(event_msg, r"^\[\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\] Phòng học: Cảnh báo tải cao")
+
 
 if __name__ == "__main__":
     unittest.main()

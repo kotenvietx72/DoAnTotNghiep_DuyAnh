@@ -49,6 +49,30 @@ last_sample_time = None
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "").strip()
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
+# ================= CẤU HÌNH MÚI GIỜ =================
+APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Ho_Chi_Minh").strip() or "Asia/Ho_Chi_Minh"
+
+
+def get_timezone():
+    """Trả về timezone đối tượng từ APP_TIMEZONE (mặc định Asia/Ho_Chi_Minh - UTC+7)."""
+    tz_name = os.environ.get("APP_TIMEZONE", APP_TIMEZONE).strip() or "Asia/Ho_Chi_Minh"
+    try:
+        import zoneinfo
+        return zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        # Fallback an toàn sang UTC+7 nếu thiếu cơ sở dữ liệu tzdata hoặc tên múi giờ không hợp lệ
+        return datetime.timezone(datetime.timedelta(hours=7))
+
+
+def get_current_time():
+    """Lấy thời gian hiện tại theo múi giờ được cấu hình."""
+    return datetime.datetime.now(get_timezone())
+
+
+def format_current_time(fmt="%d/%m/%Y %H:%M:%S"):
+    """Định dạng thời gian hiện tại theo múi giờ hệ thống."""
+    return get_current_time().strftime(fmt)
+
 
 def log_telegram_failure(response, error_type):
     """Ghi lý do API nhưng không ghi URL, thông tin nhận hoặc khóa xác thực."""
@@ -163,7 +187,7 @@ def account_runtime():
 def build_state():
     rooms = room_service.snapshot(legacy_data if simulation_mode == "legacy" else None,
                                   legacy_device_states if simulation_mode == "legacy" else None)
-    return {"server_id": server_id, "revision": state_revision, "timestamp": time.strftime("%H:%M:%S"),
+    return {"server_id": server_id, "revision": state_revision, "timestamp": format_current_time("%H:%M:%S"),
             "is_simulating": is_simulating, "mode": simulation_mode,
             "total_current": round(math.fsum(room["current"] for room in rooms.values()), 6),
             "rooms": rooms, **rooms}
@@ -175,7 +199,7 @@ def record_transitions(rooms):
         if stats["last"] == room["status"]:
             continue
         labels = {"Safe": "Đã an toàn trở lại", "Warning": "Cảnh báo tải cao", "Danger": "Nguy hiểm quá tải"}
-        message = f"[{time.strftime('%d/%m/%Y %H:%M:%S')}] {room['name']}: {labels[room['status']]} ({room['current']:.2f} A; {room['voltage']:g} V)"
+        message = f"[{format_current_time('%d/%m/%Y %H:%M:%S')}] {room['name']}: {labels[room['status']]} ({room['current']:.2f} A; {room['voltage']:g} V)"
         history_stats["event_log"].append(message)
         stats["last"] = room["status"]
         if is_simulating:
@@ -238,19 +262,19 @@ def toggle_simulation():
             if simulation_mode == "legacy":
                 update_legacy_data(0)
             history_stats = init_history()
-            history_stats["started_at"] = time.strftime("%d/%m/%Y %H:%M:%S")
+            history_stats["started_at"] = format_current_time("%d/%m/%Y %H:%M:%S")
             history_stats["initial_configs"] = deepcopy(room_service.configs)
             history_stats["mode"] = simulation_mode
             simulation_stop = threading.Event()
             is_simulating = True
             last_sample_time = time.monotonic()
             simulation_thread = socketio.start_background_task(run_simulation, simulation_stop)
-            notify("Hệ thống giám sát đã khởi động.")
+            notify(f"[{format_current_time('%d/%m/%Y %H:%M:%S')}] Hệ thống giám sát đã khởi động.")
         elif data["action"] == "stop" and is_simulating:
             account_runtime()
             is_simulating = False
             simulation_stop.set()
-            notify("Hệ thống đã dừng lấy mẫu.")
+            notify(f"[{format_current_time('%d/%m/%Y %H:%M:%S')}] Hệ thống đã dừng lấy mẫu.")
         state = publish_state()
         socketio.emit("system_status", {"is_simulating": is_simulating})
         return jsonify({"message": "Đã khởi động lấy mẫu." if is_simulating else "Đã dừng lấy mẫu.", "state": state})
@@ -301,7 +325,7 @@ def reset_settings():
     with state_lock:
         account_runtime()
         room_service.reset_settings()
-        change = f"[{time.strftime('%d/%m/%Y %H:%M:%S')}] Khôi phục ngưỡng và dòng điện mặc định của ba phòng."
+        change = f"[{format_current_time('%d/%m/%Y %H:%M:%S')}] Khôi phục ngưỡng và dòng điện mặc định của ba phòng."
         history_stats["config_changes"].append(change)
         history_stats["event_log"].append(change)
         if simulation_mode == "legacy":
@@ -315,7 +339,7 @@ def settings_api():
         if request.method == "PUT":
             account_runtime()
             room_service.update_settings(request.get_json(silent=True))
-            change = f"[{time.strftime('%d/%m/%Y %H:%M:%S')}] Cập nhật dòng điện/ngưỡng: " + "; ".join(
+            change = f"[{format_current_time('%d/%m/%Y %H:%M:%S')}] Cập nhật dòng điện/ngưỡng: " + "; ".join(
                 f"{cfg['name']} {cfg['thresh_warn']:g}/{cfg['thresh_danger']:g} A" for cfg in room_service.configs.values())
             history_stats["config_changes"].append(change)
             history_stats["event_log"].append(change)

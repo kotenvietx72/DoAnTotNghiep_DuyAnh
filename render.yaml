@@ -22,3 +22,5 @@ services:
         value: "0"
       - key: ROOM_DATABASE
         value: data/rooms.sqlite3
+      - key: APP_TIMEZONE
+        value: Asia/Ho_Chi_Minh
